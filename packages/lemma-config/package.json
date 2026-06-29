@@ -1,0 +1,15 @@
+{
+  "name": "@salesarc/lemma-config",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": { "build": "tsc" },
+  "dependencies": {
+    "lemma-sdk": "^0.5.3",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5",
+    "@types/node": "^20.14.2"
+  }
+}

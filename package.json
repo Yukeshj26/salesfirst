@@ -1,0 +1,13 @@
+{
+  "name": "salesarc",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @salesarc/api\" \"npm run dev -w @salesarc/web\"",
+    "build": "npm run build -w @salesarc/lemma-config && npm run build -w @salesarc/api && npm run build -w @salesarc/web"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -25,7 +25,7 @@ router.post('/run', async (_req, res) => {
     const queue = await runPriorityAgent();
 
     // Step 2: Draft follow-ups for top 3 leads missing a recent draft
-    const newDrafts = [];
+    const newDrafts: FollowUp[] = [];
     for (const lead of queue.slice(0, 3)) {
       try {
         const draft = await draftFollowUp(lead.id);

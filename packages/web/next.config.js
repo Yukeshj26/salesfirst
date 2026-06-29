@@ -1,9 +1,3 @@
-const path = require('path');
-const dotenv = require('dotenv');
-
-// Load environment variables from the root workspace .env file
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {

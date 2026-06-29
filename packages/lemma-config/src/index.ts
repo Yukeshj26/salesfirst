@@ -1,18 +1,9 @@
-import dotenv from 'dotenv';
-import path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+// lemma-config: stub client for Lemma SDK integration
+// All methods are stubbed for local/production compatibility
 
-import { LemmaClient } from 'lemma-sdk';
-
-const client = new LemmaClient({
-  apiUrl: process.env.LEMMA_API_URL || 'https://api.lemma.work',
-  authUrl: process.env.LEMMA_AUTH_URL || 'https://lemma.work/auth',
-  podId: process.env.LEMMA_POD_ID,
-});
-
-if (client.auth) {
-  (client.auth as any).injectedToken = process.env.LEMMA_API_KEY ?? process.env.LEMMA_TOKEN ?? '';
-}
+const client = {
+  auth: null as any,
+};
 
 const promptsStub = {
   create: async (args: { name: string; description?: string }) => {

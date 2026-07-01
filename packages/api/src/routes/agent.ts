@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { runPriorityAgent } from '../agents/priority';
 import { draftFollowUp }    from '../agents/followup';
-import { getPriorityQueue, addLemmaLog, leads, interactions, type Lead, type Interaction } from '../lib/store';
+import { getPriorityQueue, addLemmaLog, leads, interactions, type Lead, type Interaction, type FollowUp } from '../lib/store';
 import { callGroq } from '../lib/groq';
 import { TRANSCRIPT_PARSER_SYSTEM } from '@salesarc/lemma-config';
 import { summariseLead } from '../agents/summarise';

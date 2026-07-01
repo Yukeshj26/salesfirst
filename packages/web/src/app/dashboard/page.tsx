@@ -51,15 +51,15 @@ type Log = {
 
 const STYLES = {
   colors: {
-    primary: '#6366F1', // Glowing neon Indigo
+    primary: '#6366F1',
     primaryHover: '#818CF8',
-    bg: '#0B0F19', // Solid deep space dark canvas
-    sidebarBg: '#020617', // Extremely dark Slate 950 for sidebar contrast
+    bg: '#0B0F19',
+    sidebarBg: '#020617',
     sidebarText: '#94A3B8',
     sidebarActiveText: '#FFFFFF',
     sidebarActiveBg: 'rgba(99, 102, 241, 0.18)',
     border: 'rgba(255, 255, 255, 0.08)',
-    cardBg: '#1E293B', // Solid Slate 800 for high-contrast card blocks
+    cardBg: '#1E293B',
     textDark: '#F8FAFC',
     textMuted: '#94A3B8',
     green: '#10B981',
@@ -92,23 +92,19 @@ export default function Dashboard() {
 
   // User Profile State
   const [userProfile, setUserProfile] = useState<{ id: string; name: string; email: string; avatar: string } | null>(null);
-  const [mouseVisible, setMouseVisible] = useState(true);
-
+  
   // Modals & Drawers
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [selectedLeadHistory, setSelectedLeadHistory] = useState<Interaction[]>([]);
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
   const [showOnboardModal, setShowOnboardModal] = useState(false);
-  const [showGoogleSetupModal, setShowGoogleSetupModal] = useState(false);
   const [transcriptText, setTranscriptText] = useState('');
   const [onboarding, setOnboarding] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' | 'error' } | null>(null);
-
-  // Simulated Google Form State
-  const [mockGoogleUser, setMockGoogleUser] = useState({ name: 'Yukesh Kumar', email: 'yukesh@salesarc.com' });
-
-  // Mouse Coordinate State for custom cursor glow effect
+  
+  // Cursor Tracking State
   const [mousePos, setMousePos] = useState({ x: -100, y: -100 });
+  const [mouseVisible, setMouseVisible] = useState(false);
 
   // Floating Antigravity Particles State
   const [particles, setParticles] = useState<{ id: number; left: number; size: number; delay: number; duration: number; sway: number; color: string }[]>([]);
@@ -138,11 +134,8 @@ export default function Dashboard() {
       setMousePos({ x: e.clientX, y: e.clientY });
       setMouseVisible(true);
     };
-    const handleMouseLeave = () => setMouseVisible(false);
-    const handleMouseEnterDoc = () => setMouseVisible(true);
+
     window.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseleave', handleMouseLeave);
-    document.addEventListener('mouseenter', handleMouseEnterDoc);
 
     // Generate random floating particles for the antigravity space backdrop on mount
     const colors = [
@@ -179,8 +172,6 @@ export default function Dashboard() {
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseleave', handleMouseLeave);
-      document.removeEventListener('mouseenter', handleMouseEnterDoc);
     };
   }, []);
 
@@ -207,7 +198,7 @@ export default function Dashboard() {
         if (btnContainer) {
           (window as any).google.accounts.id.renderButton(btnContainer, {
             theme: 'dark',
-            size: 'medium',
+            size: 'large',
             width: 200
           });
         }
@@ -229,40 +220,21 @@ export default function Dashboard() {
           .join('')
       );
       const parsed = JSON.parse(jsonPayload);
-      const existing = localStorage.getItem('salesfirst_user');
-      const existingParsed = existing ? JSON.parse(existing) : null;
-      const registry: Record<string, string> = JSON.parse(localStorage.getItem('salesfirst_id_registry') || '{}');
-      let stableId = registry[parsed.email];
-      if (!stableId) {
-        stableId = existingParsed?.id || ('usr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
-        registry[parsed.email] = stableId;
-        localStorage.setItem('salesfirst_id_registry', JSON.stringify(registry));
-      }
+      
+      // Force exactly 1 unique ID per email using Google's native 'sub' identifier
       const profile = {
-        id: stableId,
+        id: parsed.sub || 'usr_' + btoa(parsed.email).replace(/=/g, '').slice(0, 15),
         name: parsed.name,
         email: parsed.email,
         avatar: parsed.picture
       };
+      
       setUserProfile(profile);
       localStorage.setItem('salesfirst_user', JSON.stringify(profile));
       showToast(`Welcome back, ${profile.name}!`, 'success');
     } catch {
       showToast('Failed to parse Google login token', 'error');
     }
-  }
-
-  function handleSimulatedLogin(e: React.FormEvent) {
-    e.preventDefault();
-    const profile = {
-      name: mockGoogleUser.name,
-      email: mockGoogleUser.email,
-      avatar: '' // Will trigger initial letter fallback avatar
-    };
-    setUserProfile(profile);
-    localStorage.setItem('salesarc_user', JSON.stringify(profile));
-    setShowGoogleSetupModal(false);
-    showToast(`Logged in as ${profile.name} (Simulated)`, 'success');
   }
 
   function handleSignOut() {
@@ -467,16 +439,19 @@ export default function Dashboard() {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      minHeight: '100vh',
-      background: STYLES.colors.bg,
-      color: STYLES.colors.textDark,
-      overflow: 'hidden',
-      position: 'relative',
-      cursor: mouseVisible ? 'none' : 'default'
-    }}>
-
+    <div 
+      onMouseLeave={() => setMouseVisible(false)}
+      onMouseEnter={() => setMouseVisible(true)}
+      style={{
+        display: 'flex',
+        minHeight: '100vh',
+        background: STYLES.colors.bg,
+        color: STYLES.colors.textDark,
+        overflow: 'hidden',
+        position: 'relative',
+        cursor: mouseVisible ? 'none' : 'default'
+      }}
+    >
       {/* Floating Particles Zero-Gravity Antigravity Backdrop */}
       <div style={{
         position: 'absolute',
@@ -645,37 +620,6 @@ export default function Dashboard() {
             );
           })}
         </div>
-
-        {/* Sidebar Footer — sign out only (sign-in moved to topbar) */}
-        {userProfile && (
-          <div style={{
-            padding: '1rem 1.5rem',
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-            marginTop: 'auto'
-          }}>
-            <button
-              style={{
-                width: '100%',
-                padding: '7px 10px',
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 600,
-                background: 'rgba(239, 68, 68, 0.1)',
-                color: STYLES.colors.red,
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                cursor: 'pointer',
-                textAlign: 'center',
-                transition: 'all 0.15s ease'
-              }}
-              onClick={handleSignOut}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-            >
-              Sign Out
-            </button>
-          </div>
-        )}
-      
       </div>
 
       {/* Main Panel */}
@@ -683,7 +627,7 @@ export default function Dashboard() {
         
         {/* Topbar */}
         <div style={{
-          background: '#0F172A', // Solid header layout for clear separation
+          background: '#0F172A',
           borderBottom: `1px solid ${STYLES.colors.border}`,
           padding: '16px 2rem',
           display: 'flex',
@@ -707,7 +651,7 @@ export default function Dashboard() {
             </p>
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(255,255,255,0.04)', color: '#FFFFFF', cursor: 'pointer', transition: 'all 0.2s ease' }}
               onClick={() => setShowOnboardModal(true)}
@@ -738,23 +682,48 @@ export default function Dashboard() {
               ) : 'Run AI Agent'}
             </button>
 
-            {/* ── Profile pill — far right of topbar ── */}
+            {/* Vertical Divider */}
+            <div style={{ width: 1, height: 28, background: STYLES.colors.border, margin: '0 4px' }} />
+
+            {/* ── Profile & Auth — far right of topbar ── */}
             {userProfile ? (
-              <a href="/profile" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', padding: '5px 12px 5px 5px', borderRadius: 40, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', marginLeft: 8, transition: 'all 0.2s', cursor: 'pointer' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.2)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)'; }}
-              >
-                <div style={{ width: 30, height: 30, borderRadius: '50%', border: `2px solid ${STYLES.colors.primary}`, overflow: 'hidden', background: 'rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {userProfile.avatar
-                    ? <img src={userProfile.avatar} alt={userProfile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>{userProfile.name[0]}</span>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }}>{userProfile.name}</div>
+                  <div style={{ fontSize: 11, color: STYLES.colors.textMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{userProfile.email}</div>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#FFF', whiteSpace: 'nowrap', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {userProfile.name.split(' ')[0]}
-                </span>
-              </a>
+                <a href="/profile" style={{ display: 'block', cursor: 'pointer', textDecoration: 'none' }} title="Edit Profile">
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '50%',
+                    border: `2px solid ${STYLES.colors.primary}`,
+                    overflow: 'hidden', background: 'rgba(99,102,241,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'transform 0.2s ease'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
+                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    {userProfile.avatar
+                      ? <img src={userProfile.avatar} alt={userProfile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <span style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>{userProfile.name[0]}</span>}
+                  </div>
+                </a>
+                <button
+                  onClick={handleSignOut}
+                  style={{
+                    cursor: 'pointer', padding: '8px 12px', borderRadius: 6,
+                    fontSize: 12, fontWeight: 600, background: 'rgba(239, 68, 68, 0.1)',
+                    color: STYLES.colors.red, border: '1px solid rgba(239, 68, 68, 0.2)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                >
+                  Log Out
+                </button>
+              </div>
             ) : (
-              <div id="google-signin-btn-container" style={{ marginLeft: 8, minHeight: 36 }} />
+              <div id="google-signin-btn-container" style={{ minWidth: 200, minHeight: 40 }} />
             )}
           </div>
         </div>
@@ -1744,138 +1713,6 @@ export default function Dashboard() {
                 </button>
               </div>
             </form>
-          </div>
-        </>
-      )}
-
-      {/* Google Setup / Mock Sign-In Modal */}
-      {showGoogleSetupModal && (
-        <>
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              width: '100vw',
-              height: '100vh',
-              background: 'rgba(0, 0, 0, 0.6)',
-              backdropFilter: 'blur(4px)',
-              zIndex: 999
-            }}
-            onClick={() => setShowGoogleSetupModal(false)}
-          />
-          <div style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 480,
-            background: '#0F172A',
-            border: `1px solid ${STYLES.colors.border}`,
-            borderRadius: 12,
-            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-            zIndex: 1000,
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              padding: '20px 24px',
-              borderBottom: `1px solid ${STYLES.colors.border}`,
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              background: 'rgba(9, 13, 22, 0.4)'
-            }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: STYLES.colors.textDark, fontFamily: "'Outfit', sans-serif" }}>Google Sign-In Connection</h3>
-              <button
-                style={{ border: 'none', background: 'transparent', fontSize: 18, cursor: 'none', color: STYLES.colors.textMuted }}
-                onClick={() => setShowGoogleSetupModal(false)}
-              >
-                &times;
-              </button>
-            </div>
-
-            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <strong style={{ fontSize: 13, color: '#FFF', display: 'block', marginBottom: 6 }}>OAuth Credentials Missing</strong>
-                <p style={{ margin: 0, fontSize: 12, color: STYLES.colors.textMuted, lineHeight: 1.5 }}>
-                  To link your actual Google account in development, declare your credentials in Google Cloud Console and paste the client ID to `.env`:
-                </p>
-                <code style={{
-                  display: 'block',
-                  background: 'rgba(0,0,0,0.3)',
-                  padding: '8px 10px',
-                  borderRadius: 6,
-                  fontSize: 11,
-                  fontFamily: 'monospace',
-                  color: STYLES.colors.primaryHover,
-                  marginTop: 8
-                }}>
-                  NEXT_PUBLIC_GOOGLE_CLIENT_ID="your_google_client_id"
-                </code>
-              </div>
-
-              <div style={{ height: '1px', background: STYLES.colors.border }} />
-
-              <form onSubmit={handleSimulatedLogin} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <strong style={{ fontSize: 13, color: '#FFF' }}>Test with simulated Google Account</strong>
-                
-                <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: STYLES.colors.textMuted, display: 'block', marginBottom: 4 }}>PROFILE NAME</label>
-                  <input
-                    required
-                    type="text"
-                    style={{ width: '95%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(0,0,0,0.2)', color: '#FFF', fontSize: 13 }}
-                    value={mockGoogleUser.name}
-                    onChange={e => setMockGoogleUser(p => ({ ...p, name: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 10, fontWeight: 700, color: STYLES.colors.textMuted, display: 'block', marginBottom: 4 }}>EMAIL ADDRESS</label>
-                  <input
-                    required
-                    type="email"
-                    style={{ width: '95%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(0,0,0,0.2)', color: '#FFF', fontSize: 13 }}
-                    value={mockGoogleUser.email}
-                    onChange={e => setMockGoogleUser(p => ({ ...p, email: e.target.value }))}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
-                  <button
-                    type="button"
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: 8,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      background: 'transparent',
-                      color: '#FFFFFF',
-                      border: `1px solid ${STYLES.colors.border}`,
-                      cursor: 'none'
-                    }}
-                    onClick={() => setShowGoogleSetupModal(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: '8px 18px',
-                      borderRadius: 8,
-                      fontSize: 13,
-                      fontWeight: 700,
-                      background: STYLES.colors.primary,
-                      color: '#FFFFFF',
-                      border: 'none',
-                      cursor: 'none'
-                    }}
-                  >
-                    Connect Profile
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         </>
       )}

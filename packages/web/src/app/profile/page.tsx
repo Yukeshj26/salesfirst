@@ -1,8 +1,39 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+
+const C = {
+  primary: '#6366F1',
+  bg: '#0B0F19',
+  cardBg: '#1E293B',
+  border: 'rgba(255, 255, 255, 0.08)',
+  textDark: '#F8FAFC',
+  textMuted: '#94A3B8',
+  red: '#EF4444',
+  green: '#10B981',
+};
+
+/** Returns the same stable user ID for a given email — always. */
+function getOrCreateUserId(email: string): string {
+  const registry: Record<string, string> = JSON.parse(
+    localStorage.getItem('salesfirst_id_registry') || '{}'
+  );
+  if (registry[email]) return registry[email];
+  const newId = 'usr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  registry[email] = newId;
+  localStorage.setItem('salesfirst_id_registry', JSON.stringify(registry));
+  return newId;
+}
+
+type UserProfile = {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  title?: string;
+  company?: string;
+};
 
 const Logo = () => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -23,111 +54,70 @@ const Logo = () => (
   </div>
 );
 
-const STYLES = {
-  colors: {
-    primary: '#6366F1',
-    primaryHover: '#818CF8',
-    bg: '#0B0F19',
-    cardBg: '#1E293B',
-    border: 'rgba(255, 255, 255, 0.08)',
-    textDark: '#F8FAFC',
-    textMuted: '#94A3B8',
-    red: '#EF4444',
-    green: '#10B981',
-  }
-};
-
-type UserProfile = {
-  id?: string;
-  name: string;
-  email: string;
-  avatar: string;
-  title?: string;
-  company?: string;
-};
-
-// Preset avatar options
-const AVATAR_PRESETS = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80', // Female developer
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80', // Male developer
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80', // Professional female
-  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80', // Professional male
-];
-
 export default function ProfilePage() {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [avatar, setAvatar] = useState('');
   const [title, setTitle] = useState('');
   const [company, setCompany] = useState('');
+  const [avatar, setAvatar] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('salesfirst_user');
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-        setName(parsed.name || '');
-        setEmail(parsed.email || '');
-        setAvatar(parsed.avatar || '');
-        setTitle(parsed.title || 'Founder & CEO');
-        setCompany(parsed.company || 'My SaaS Corp');
-      } catch (e) {
-        // Fallback profile if parsing fails
-        initializeDefaultProfile();
+    const raw = localStorage.getItem('salesfirst_user');
+    if (!raw) { router.push('/'); return; }
+    try {
+      const parsed: UserProfile = JSON.parse(raw);
+      // Ensure the user's email always maps to the same stable ID
+      const stableId = getOrCreateUserId(parsed.email);
+      if (parsed.id !== stableId) {
+        parsed.id = stableId;
+        localStorage.setItem('salesfirst_user', JSON.stringify(parsed));
       }
-    } else {
-      // Redirect to homepage if user tries to access profile without logging in
-      router.push('/');
-    }
+      setUser(parsed);
+      setName(parsed.name || '');
+      setTitle(parsed.title || '');
+      setCompany(parsed.company || '');
+      setAvatar(parsed.avatar || '');
+      setAvatarPreview(parsed.avatar || '');
+    } catch { router.push('/'); }
   }, []);
 
-  function initializeDefaultProfile() {
-    const defaultUser = {
-      id: 'usr_' + Math.random().toString(36).substr(2, 9),
-      name: 'Yukesh Kumar',
-      email: 'yukesh@salesarc.com',
-      avatar: '',
-      title: 'Founder & CEO',
-      company: 'SalesArc Inc',
-    };
-    setUser(defaultUser);
-    setName(defaultUser.name);
-    setEmail(defaultUser.email);
-    setAvatar(defaultUser.avatar);
-    setTitle(defaultUser.title);
-    setCompany(defaultUser.company);
-    localStorage.setItem('salesfirst_user', JSON.stringify(defaultUser));
+  function showToast(message: string, type: 'success' | 'error' = 'success') {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3200);
   }
 
-  function showToast(message: string, type: 'success' | 'error') {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 3 * 1024 * 1024) { showToast('Image must be under 3 MB', 'error'); return; }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+      setAvatar(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   }
 
   function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) {
-      showToast('Name and Email are required', 'error');
-      return;
-    }
-
-    const updatedProfile: UserProfile = {
-      ...user,
-      id: user?.id || 'usr_' + Math.random().toString(36).substr(2, 9),
-      name,
-      email,
+    if (!name.trim()) { showToast('Name is required', 'error'); return; }
+    setSaving(true);
+    // email and id are immutable — always preserved from stored user
+    const updated: UserProfile = {
+      ...user!,
+      name: name.trim(),
+      title: title.trim(),
+      company: company.trim(),
       avatar,
-      title,
-      company
     };
-
-    setUser(updatedProfile);
-    localStorage.setItem('salesfirst_user', JSON.stringify(updatedProfile));
-    showToast('Profile updated successfully!', 'success');
+    localStorage.setItem('salesfirst_user', JSON.stringify(updated));
+    setUser(updated);
+    setTimeout(() => { setSaving(false); showToast('Profile saved!'); }, 400);
   }
 
   function handleLogout() {
@@ -135,394 +125,175 @@ export default function ProfilePage() {
     router.push('/');
   }
 
-  // Handle local file upload & base64 conversion
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        showToast('Image must be under 2MB', 'error');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
-        showToast('Avatar uploaded! Click Save to apply.', 'success');
-      };
-      reader.readAsDataURL(file);
-    }
-  }
-
-  // Unknown person SVG component
-  const UnknownPersonSVG = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: '60%', height: '60%', color: STYLES.colors.textMuted }}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-    </svg>
-  );
+  if (!user) return null;
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: STYLES.colors.bg,
-      color: STYLES.colors.textDark,
-      fontFamily: "'Inter', sans-serif",
-      position: 'relative',
-      padding: '40px 20px',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-    }}>
-      {/* Toast Notification */}
+    <div style={{ minHeight: '100vh', background: C.bg, color: C.textDark, fontFamily: "'Inter', sans-serif", padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+      {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed',
-          top: 24,
-          right: 24,
-          background: toast.type === 'success' ? 'rgba(16, 185, 129, 0.9)' : 'rgba(239, 68, 68, 0.9)',
-          color: '#FFF',
-          padding: '12px 24px',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 600,
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(8px)',
-          zIndex: 1000,
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-        }}>
+        <div style={{ position: 'fixed', top: 24, right: 24, background: toast.type === 'success' ? 'rgba(16,185,129,0.92)' : 'rgba(239,68,68,0.92)', color: '#FFF', padding: '12px 24px', borderRadius: 10, fontSize: 14, fontWeight: 600, boxShadow: '0 8px 20px rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)', zIndex: 1000, border: '1px solid rgba(255,255,255,0.12)' }}>
           {toast.message}
         </div>
       )}
 
-      {/* Header bar */}
-      <div style={{
-        width: '100%',
-        maxWidth: 800,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 40,
-        borderBottom: `1px solid ${STYLES.colors.border}`,
-        paddingBottom: 20
-      }}>
-        <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Logo />
-        </Link>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <Link href="/dashboard" style={{
-            textDecoration: 'none',
-            fontSize: 13,
-            fontWeight: 600,
-            color: STYLES.colors.textMuted,
-            padding: '8px 16px',
-            borderRadius: 8,
-            border: `1px solid ${STYLES.colors.border}`,
-            background: 'rgba(255,255,255,0.02)',
-            transition: 'all 0.2s ease',
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = '#FFF'}
-          onMouseLeave={e => e.currentTarget.style.color = STYLES.colors.textMuted}
-          >
-            Go to Dashboard
-          </Link>
-
-          {/* Integrated Profile Picture Icon */}
-          <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            border: `1.5px solid ${STYLES.colors.primary}`,
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(255,255,255,0.03)',
-            boxShadow: '0 0 12px rgba(99, 102, 241, 0.2)'
-          }}>
-            {avatar ? (
-              <img src={avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <UnknownPersonSVG />
-            )}
-          </div>
-        </div>
+      {/* Header */}
+      <div style={{ width: '100%', maxWidth: 680, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 36 }}>
+        <a href="/" style={{ textDecoration: 'none' }}><Logo /></a>
+        <a href="/dashboard" style={{ fontSize: 13, fontWeight: 600, color: C.textMuted, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: `1px solid ${C.border}`, transition: 'all 0.2s' }}
+          onMouseEnter={e => { e.currentTarget.style.color = '#fff'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderColor = C.border; }}
+        >
+          ← Dashboard
+        </a>
       </div>
 
-      {/* Profile Card Container */}
-      <div style={{
-        width: '100%',
-        maxWidth: 600,
-        background: STYLES.colors.cardBg,
-        border: `1px solid ${STYLES.colors.border}`,
-        borderRadius: 16,
-        padding: '36px',
-        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 28
-      }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, fontFamily: "'Outfit', sans-serif" }}>User Profile</h1>
-          <p style={{ margin: '8px 0 0 0', fontSize: 13, color: STYLES.colors.textMuted }}>Manage your personal details and app configuration</p>
+      {/* Card */}
+      <div style={{ width: '100%', maxWidth: 680, background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 20, overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.5)' }}>
+
+        {/* Top banner */}
+        <div style={{ height: 110, background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%)', position: 'relative' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 60% 50%, rgba(99,102,241,0.3) 0%, transparent 70%)' }} />
         </div>
 
-        {/* Profile Picture Upload & Presets Area */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, alignItems: 'center', borderBottom: `1px solid ${STYLES.colors.border}`, paddingBottom: 24 }}>
-          <div style={{
-            width: 100,
-            height: 100,
-            borderRadius: '50%',
-            border: `3px solid ${STYLES.colors.primary}`,
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(255,255,255,0.03)',
-            boxShadow: '0 0 20px rgba(99, 102, 241, 0.15)',
-            position: 'relative'
-          }}>
-            {avatar ? (
-              <img src={avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              <UnknownPersonSVG />
-            )}
+        <div style={{ padding: '0 36px 36px', position: 'relative' }}>
+
+          {/* Avatar — overlapping banner */}
+          <div style={{ position: 'relative', display: 'inline-block', marginTop: -54, marginBottom: 20 }}>
+            <div style={{ width: 108, height: 108, borderRadius: '50%', border: `4px solid ${C.cardBg}`, overflow: 'hidden', background: '#1e1b4b', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }}>
+              {avatarPreview
+                ? <img src={avatarPreview} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: '55%', height: '55%', color: C.textMuted }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                  </svg>
+              }
+            </div>
+            {/* Edit camera icon overlay */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{ position: 'absolute', bottom: 4, right: 4, width: 30, height: 30, borderRadius: '50%', background: C.primary, border: '2px solid #1E293B', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.4)', transition: 'transform 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              title="Change profile picture"
+            >
+              <svg width={14} height={14} fill="none" stroke="white" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+              </svg>
+            </button>
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1, minWidth: 200 }}>
-            <span style={{ fontSize: 13, fontWeight: 600 }}>Choose Profile Picture</span>
-            
-            {/* Presets */}
-            <div style={{ display: 'flex', gap: 10 }}>
-              {AVATAR_PRESETS.map((preset, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setAvatar(preset)}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    border: avatar === preset ? `2px solid ${STYLES.colors.primary}` : '2px solid transparent',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    padding: 0,
-                    background: 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <img src={preset} alt="preset" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </button>
-              ))}
+          {/* User ID badge */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: 20, padding: '4px 12px', fontSize: 11, color: '#818CF8', fontWeight: 600, fontFamily: 'monospace' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366F1', display: 'inline-block' }} />
+              ID: {user.id}
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSave}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 18 }}>
+              {/* Name */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Full Name *</label>
+                <input
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: '#FFF', outline: 'none', transition: 'border-color 0.15s' }}
+                  onFocus={e => e.currentTarget.style.borderColor = C.primary}
+                  onBlur={e => e.currentTarget.style.borderColor = C.border}
+                />
+              </div>
+
+              {/* Email — read-only, locks the user ID */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Email
+                  <span style={{ background: 'rgba(99,102,241,0.15)', color: '#818CF8', fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, letterSpacing: 0 }}>LOCKED</span>
+                </label>
+                <input
+                  value={user.email}
+                  readOnly
+                  style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid rgba(255,255,255,0.04)`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: C.textMuted, outline: 'none', cursor: 'not-allowed' }}
+                />
+              </div>
+
+              {/* Title */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Job Title</label>
+                <input
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="e.g. Founder & CEO"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: '#FFF', outline: 'none', transition: 'border-color 0.15s' }}
+                  onFocus={e => e.currentTarget.style.borderColor = C.primary}
+                  onBlur={e => e.currentTarget.style.borderColor = C.border}
+                />
+              </div>
+
+              {/* Company */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase' }}>Company</label>
+                <input
+                  value={company}
+                  onChange={e => setCompany(e.target.value)}
+                  placeholder="e.g. Acme Corp"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 14, color: '#FFF', outline: 'none', transition: 'border-color 0.15s' }}
+                  onFocus={e => e.currentTarget.style.borderColor = C.primary}
+                  onBlur={e => e.currentTarget.style.borderColor = C.border}
+                />
+              </div>
+            </div>
+
+            {/* Profile picture upload hint */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(99,102,241,0.06)', border: '1px dashed rgba(99,102,241,0.25)', borderRadius: 10, padding: '12px 16px', marginBottom: 24, cursor: 'pointer' }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <svg width={18} height={18} fill="none" stroke="#818CF8" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              </svg>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#818CF8' }}>Upload profile picture</div>
+                <div style={{ fontSize: 11, color: C.textMuted }}>JPG, PNG, GIF · Max 3 MB</div>
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 12 }}>
               <button
-                onClick={() => setAvatar('')}
-                title="Use empty/anonymous profile photo"
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '50%',
-                  border: avatar === '' ? `2px solid ${STYLES.colors.primary}` : `1px solid ${STYLES.colors.border}`,
-                  background: 'rgba(255,255,255,0.05)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: STYLES.colors.textMuted
-                }}
+                type="submit"
+                disabled={saving}
+                style={{ flex: 1, padding: '12px', borderRadius: 10, background: C.primary, color: '#FFF', border: 'none', fontSize: 14, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.75 : 1, boxShadow: '0 4px 14px rgba(99,102,241,0.35)', transition: 'all 0.2s' }}
+                onMouseEnter={e => !saving && (e.currentTarget.style.background = '#818CF8')}
+                onMouseLeave={e => (e.currentTarget.style.background = C.primary)}
               >
-                Ø
+                {saving ? 'Saving…' : '✓ Save Changes'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{ padding: '12px 24px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: C.red, border: '1px solid rgba(239,68,68,0.25)', fontSize: 14, fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8 }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)'; }}
+              >
+                <svg width={15} height={15} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                </svg>
+                Log Out
               </button>
             </div>
-
-            {/* Custom URL or Upload */}
-            <div style={{ display: 'flex', gap: 10 }}>
-              <label style={{
-                padding: '6px 12px',
-                borderRadius: 6,
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: `1px solid ${STYLES.colors.border}`,
-                fontSize: 12,
-                fontWeight: 600,
-                color: STYLES.colors.textDark,
-                cursor: 'pointer',
-                textAlign: 'center'
-              }}>
-                Upload Image
-                <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
-              </label>
-              <input
-                type="text"
-                placeholder="Or paste image URL..."
-                value={avatar.startsWith('data:') ? '' : avatar}
-                onChange={e => setAvatar(e.target.value)}
-                style={{
-                  flex: 1,
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: `1px solid ${STYLES.colors.border}`,
-                  borderRadius: 6,
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  color: '#FFF',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
+          </form>
         </div>
-
-        {/* Profile details form */}
-        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Read Only User ID */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: STYLES.colors.textMuted }}>User ID (Unique identification)</label>
-            <input
-              type="text"
-              readOnly
-              value={user?.id || 'usr_loading...'}
-              style={{
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: `1px solid ${STYLES.colors.border}`,
-                borderRadius: 8,
-                padding: '10px 14px',
-                fontSize: 13,
-                color: STYLES.colors.textMuted,
-                cursor: 'not-allowed',
-                outline: 'none'
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: 16 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: STYLES.colors.textMuted }}>Name</label>
-              <input
-                type="text"
-                required
-                value={name}
-                onChange={e => setName(e.target.value)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: `1px solid ${STYLES.colors.border}`,
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 13,
-                  color: '#FFF',
-                  outline: 'none',
-                  transition: 'all 0.15s ease'
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = STYLES.colors.primary}
-                onBlur={e => e.currentTarget.style.borderColor = STYLES.colors.border}
-              />
-            </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: STYLES.colors.textMuted }}>Email</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: `1px solid ${STYLES.colors.border}`,
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 13,
-                  color: '#FFF',
-                  outline: 'none',
-                  transition: 'all 0.15s ease'
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = STYLES.colors.primary}
-                onBlur={e => e.currentTarget.style.borderColor = STYLES.colors.border}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 16 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: STYLES.colors.textMuted }}>Title / Role</label>
-              <input
-                type="text"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: `1px solid ${STYLES.colors.border}`,
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 13,
-                  color: '#FFF',
-                  outline: 'none',
-                  transition: 'all 0.15s ease'
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = STYLES.colors.primary}
-                onBlur={e => e.currentTarget.style.borderColor = STYLES.colors.border}
-              />
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: STYLES.colors.textMuted }}>Company</label>
-              <input
-                type="text"
-                value={company}
-                onChange={e => setCompany(e.target.value)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: `1px solid ${STYLES.colors.border}`,
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 13,
-                  color: '#FFF',
-                  outline: 'none',
-                  transition: 'all 0.15s ease'
-                }}
-                onFocus={e => e.currentTarget.style.borderColor = STYLES.colors.primary}
-                onBlur={e => e.currentTarget.style.borderColor = STYLES.colors.border}
-              />
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginTop: 12 }}>
-            <button
-              type="button"
-              onClick={handleLogout}
-              style={{
-                padding: '12px 24px',
-                borderRadius: 8,
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                color: STYLES.colors.red,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-            >
-              Log Out
-            </button>
-
-            <button
-              type="submit"
-              style={{
-                padding: '12px 32px',
-                borderRadius: 8,
-                background: STYLES.colors.primary,
-                color: '#FFF',
-                border: 'none',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)'
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = STYLES.colors.primaryHover}
-              onMouseLeave={e => e.currentTarget.style.background = STYLES.colors.primary}
-            >
-              Save Changes
-            </button>
-          </div>
-        </form>
       </div>
+
+      {/* Footer note */}
+      <p style={{ marginTop: 20, fontSize: 12, color: 'rgba(148,163,184,0.5)', textAlign: 'center' }}>
+        Your email is tied to your account ID and cannot be changed.
+        Each email address has exactly one unique user ID.
+      </p>
     </div>
   );
 }

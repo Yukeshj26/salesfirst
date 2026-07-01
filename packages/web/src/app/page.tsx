@@ -16,8 +16,16 @@ const C = {
   blue: '#06B6D4',
 };
 
-function generateUserId(): string {
-  return 'usr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+/** Returns the same stable user ID for a given email — always. */
+function getOrCreateUserId(email: string): string {
+  const registry: Record<string, string> = JSON.parse(
+    localStorage.getItem('salesfirst_id_registry') || '{}'
+  );
+  if (registry[email]) return registry[email];
+  const newId = 'usr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  registry[email] = newId;
+  localStorage.setItem('salesfirst_id_registry', JSON.stringify(registry));
+  return newId;
 }
 
 type UserProfile = { id: string; name: string; email: string; avatar: string };
@@ -140,11 +148,8 @@ export default function HomePage() {
     try {
       const [, b64] = res.credential.split('.');
       const payload = JSON.parse(atob(b64.replace(/-/g, '+').replace(/_/g, '/')));
-      // Preserve existing userId or create new unique one
-      const existing = localStorage.getItem('salesfirst_user');
-      const existingParsed = existing ? JSON.parse(existing) : null;
       const profile: UserProfile = {
-        id: existingParsed?.id || generateUserId(),
+        id: getOrCreateUserId(payload.email),
         name: payload.name,
         email: payload.email,
         avatar: payload.picture || '',

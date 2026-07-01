@@ -231,8 +231,15 @@ export default function Dashboard() {
       const parsed = JSON.parse(jsonPayload);
       const existing = localStorage.getItem('salesfirst_user');
       const existingParsed = existing ? JSON.parse(existing) : null;
+      const registry: Record<string, string> = JSON.parse(localStorage.getItem('salesfirst_id_registry') || '{}');
+      let stableId = registry[parsed.email];
+      if (!stableId) {
+        stableId = existingParsed?.id || ('usr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+        registry[parsed.email] = stableId;
+        localStorage.setItem('salesfirst_id_registry', JSON.stringify(registry));
+      }
       const profile = {
-        id: existingParsed?.id || ('usr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+        id: stableId,
         name: parsed.name,
         email: parsed.email,
         avatar: parsed.picture

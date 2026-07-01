@@ -91,7 +91,8 @@ export default function Dashboard() {
   const [running, setRunning] = useState(false);
 
   // User Profile State
-  const [userProfile, setUserProfile] = useState<{ name: string; email: string; avatar: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ id: string; name: string; email: string; avatar: string } | null>(null);
+  const [mouseVisible, setMouseVisible] = useState(true);
 
   // Modals & Drawers
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -135,8 +136,13 @@ export default function Dashboard() {
 
     const handleMouseMove = (e: MouseEvent) => {
       setMousePos({ x: e.clientX, y: e.clientY });
+      setMouseVisible(true);
     };
+    const handleMouseLeave = () => setMouseVisible(false);
+    const handleMouseEnterDoc = () => setMouseVisible(true);
     window.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseleave', handleMouseLeave);
+    document.addEventListener('mouseenter', handleMouseEnterDoc);
 
     // Generate random floating particles for the antigravity space backdrop on mount
     const colors = [
@@ -173,6 +179,8 @@ export default function Dashboard() {
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      document.removeEventListener('mouseenter', handleMouseEnterDoc);
     };
   }, []);
 
@@ -221,7 +229,10 @@ export default function Dashboard() {
           .join('')
       );
       const parsed = JSON.parse(jsonPayload);
+      const existing = localStorage.getItem('salesfirst_user');
+      const existingParsed = existing ? JSON.parse(existing) : null;
       const profile = {
+        id: existingParsed?.id || ('usr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
         name: parsed.name,
         email: parsed.email,
         avatar: parsed.picture
@@ -456,7 +467,7 @@ export default function Dashboard() {
       color: STYLES.colors.textDark,
       overflow: 'hidden',
       position: 'relative',
-      cursor: 'none'
+      cursor: mouseVisible ? 'none' : 'default'
     }}>
 
       {/* Floating Particles Zero-Gravity Antigravity Backdrop */}
@@ -501,11 +512,11 @@ export default function Dashboard() {
         background: 'radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(99, 102, 241, 0) 70%)',
         pointerEvents: 'none',
         zIndex: 1,
-        transition: 'transform 0.05s ease-out'
+        opacity: mouseVisible ? 1 : 0,
+        transition: 'opacity 0.2s ease'
       }} />
 
-      {/* Custom Neon Cursor Reticle */}
-      {/* Outer Diamond Reticle with Elastic lag transition */}
+      {/* Custom Neon Cursor Reticle — hidden when mouse leaves page */}
       <div style={{
         position: 'fixed',
         top: mousePos.y - 12,
@@ -518,7 +529,8 @@ export default function Dashboard() {
         transform: 'rotate(45deg)',
         pointerEvents: 'none',
         zIndex: 99998,
-        transition: 'top 0.1s cubic-bezier(0.25, 1, 0.5, 1), left 0.1s cubic-bezier(0.25, 1, 0.5, 1)'
+        opacity: mouseVisible ? 1 : 0,
+        transition: 'opacity 0.15s ease, top 0.1s cubic-bezier(0.25, 1, 0.5, 1), left 0.1s cubic-bezier(0.25, 1, 0.5, 1)'
       }} />
 
       {/* Inner White Core Dot */}
@@ -532,7 +544,9 @@ export default function Dashboard() {
         background: '#FFFFFF',
         boxShadow: `0 0 8px 2px ${STYLES.colors.primary}`,
         pointerEvents: 'none',
-        zIndex: 99999
+        zIndex: 99999,
+        opacity: mouseVisible ? 1 : 0,
+        transition: 'opacity 0.15s ease'
       }} />
 
       {/* Toast Notification */}
@@ -590,7 +604,7 @@ export default function Dashboard() {
             background: STYLES.colors.primary,
             boxShadow: `0 0 15px 4px ${STYLES.colors.primary}`
           }} />
-          SalesArc
+          SalesFirst
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
@@ -625,116 +639,36 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* User Profile / Google Sign-in Footer */}
-        <div style={{
-          padding: '1.5rem',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          marginTop: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12
-        }}>
-          {userProfile ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {userProfile.avatar ? (
-                  <img
-                    src={userProfile.avatar}
-                    alt={userProfile.name}
-                    style={{ width: 34, height: 34, borderRadius: '50%', border: '1.5px solid #6366F1' }}
-                  />
-                ) : (
-                  <div style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: '50%',
-                    background: '#6366F1',
-                    color: '#FFF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 700,
-                    fontSize: 14,
-                    boxShadow: '0 0 10px rgba(99, 102, 241, 0.3)'
-                  }}>
-                    {userProfile.name[0]}
-                  </div>
-                )}
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {userProfile.name}
-                  </div>
-                  <div style={{ fontSize: 11, color: STYLES.colors.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {userProfile.email}
-                  </div>
-                </div>
-              </div>
-              <button
-                style={{
-                  width: '100%',
-                  padding: '6px 10px',
-                  borderRadius: 6,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  color: STYLES.colors.red,
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  cursor: 'none',
-                  textAlign: 'center',
-                  transition: 'all 0.15s ease'
-                }}
-                onClick={handleSignOut}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-              >
-                Sign Out
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {/* Slot for official Google Sign-in button */}
-              <div id="google-signin-btn-container" style={{ 
-                width: '100%', 
-                minHeight: 36, 
-                display: (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID.trim()) ? 'block' : 'none' 
-              }} />
-              
-              {/* Fallback button if Client ID is not configured */}
-              {!(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID.trim()) && (
-                <button
-                  style={{
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: 6,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    color: '#FFFFFF',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    cursor: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    transition: 'all 0.15s ease'
-                  }}
-                  onClick={() => setShowGoogleSetupModal(true)}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'}
-                >
-                  <svg style={{ width: 14, height: 14 }} viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12.24 10.285V14.4h6.887c-.648 2.428-2.519 4.114-5.136 4.114-3.435 0-6.223-2.788-6.223-6.223s2.788-6.223 6.223-6.223c1.554 0 2.966.574 4.05 1.512l3.05-3.05C18.99 2.65 15.858 1.5 12.24 1.5c-5.8 0-10.5 4.7-10.5 10.5s4.7 10.5 10.5 10.5c5.348 0 9.817-3.834 9.817-9.817 0-.58-.065-1.127-.175-1.648H12.24z"/>
-                  </svg>
-                  Sign in with Google
-                </button>
-              )}
-            </div>
-          )}
-          
-          <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 4 }}>
-            Lemma SDK v0.5.3 · Local Stack
+        {/* Sidebar Footer — sign out only (sign-in moved to topbar) */}
+        {userProfile && (
+          <div style={{
+            padding: '1rem 1.5rem',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            marginTop: 'auto'
+          }}>
+            <button
+              style={{
+                width: '100%',
+                padding: '7px 10px',
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                background: 'rgba(239, 68, 68, 0.1)',
+                color: STYLES.colors.red,
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                cursor: 'pointer',
+                textAlign: 'center',
+                transition: 'all 0.15s ease'
+              }}
+              onClick={handleSignOut}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+            >
+              Sign Out
+            </button>
           </div>
-        </div>
+        )}
+      
       </div>
 
       {/* Main Panel */}
@@ -766,22 +700,9 @@ export default function Dashboard() {
             </p>
           </div>
           
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '9px 16px',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                border: `1px solid ${STYLES.colors.border}`,
-                background: 'rgba(255,255,255,0.04)',
-                color: '#FFFFFF',
-                cursor: 'none',
-                transition: 'all 0.2s ease'
-              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(255,255,255,0.04)', color: '#FFFFFF', cursor: 'pointer', transition: 'all 0.2s ease' }}
               onClick={() => setShowOnboardModal(true)}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
@@ -790,20 +711,7 @@ export default function Dashboard() {
               Onboard from Transcript
             </button>
             <button
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '9px 16px',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                border: `1px solid ${STYLES.colors.border}`,
-                background: 'rgba(255,255,255,0.04)',
-                color: '#FFFFFF',
-                cursor: 'none',
-                transition: 'all 0.2s ease'
-              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(255,255,255,0.04)', color: '#FFFFFF', cursor: 'pointer', transition: 'all 0.2s ease' }}
               onClick={() => setShowAddLeadModal(true)}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
@@ -812,42 +720,35 @@ export default function Dashboard() {
               Add Lead
             </button>
             <button
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '9px 18px',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                border: 'none',
-                background: STYLES.colors.primary,
-                color: '#FFFFFF',
-                cursor: 'none',
-                boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)',
-                transition: 'all 0.2s ease',
-                opacity: running ? 0.75 : 1
-              }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', background: STYLES.colors.primary, color: '#FFFFFF', cursor: 'pointer', boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)', transition: 'all 0.2s ease', opacity: running ? 0.75 : 1 }}
               onClick={runAgent}
               disabled={running}
               onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 25px rgba(99, 102, 241, 0.6)'}
               onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 15px rgba(99, 102, 241, 0.4)'}
             >
               {running ? (
-                <>
-                  <span className="spinner" style={{
-                    width: 14,
-                    height: 14,
-                    border: '2px solid #fff',
-                    borderTop: '2px solid transparent',
-                    borderRadius: '50%',
-                    display: 'inline-block',
-                    animation: 'spin 1s linear infinite'
-                  }} />
-                  Running...
-                </>
+                <><span style={{ width: 14, height: 14, border: '2px solid #fff', borderTop: '2px solid transparent', borderRadius: '50%', display: 'inline-block', animation: 'spin 1s linear infinite' }} />Running...</>
               ) : 'Run AI Agent'}
             </button>
+
+            {/* ── Profile pill — far right of topbar ── */}
+            {userProfile ? (
+              <a href="/profile" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', padding: '5px 12px 5px 5px', borderRadius: 40, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', marginLeft: 8, transition: 'all 0.2s', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.2)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.5)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.1)'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)'; }}
+              >
+                <div style={{ width: 30, height: 30, borderRadius: '50%', border: `2px solid ${STYLES.colors.primary}`, overflow: 'hidden', background: 'rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {userProfile.avatar
+                    ? <img src={userProfile.avatar} alt={userProfile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>{userProfile.name[0]}</span>}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#FFF', whiteSpace: 'nowrap', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {userProfile.name.split(' ')[0]}
+                </span>
+              </a>
+            ) : (
+              <div id="google-signin-btn-container" style={{ marginLeft: 8, minHeight: 36 }} />
+            )}
           </div>
         </div>
 

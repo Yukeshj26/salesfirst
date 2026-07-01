@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'SalesArc — AI Follow-up CRM',
-  description: 'AI-powered CRM for founders and early sales teams',
+  title: 'SalesFirst — AI Follow-up CRM',
+  description: 'AI-powered CRM for founders and early sales teams. Never let a lead go cold.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

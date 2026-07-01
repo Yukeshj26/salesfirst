@@ -91,9 +91,12 @@ export default function Dashboard() {
   const [running, setRunning] = useState(false);
 
   // User Profile State
-  const [userProfile, setUserProfile] = useState<{ id: string; name: string; email: string; avatar: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{ id: string; name: string; email: string; avatar: string; title?: string; company?: string } | null>(null);
   
   // Modals & Drawers
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [editProfile, setEditProfile] = useState({ name: '', title: '', company: '', avatar: '' });
+
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [selectedLeadHistory, setSelectedLeadHistory] = useState<Interaction[]>([]);
   const [showAddLeadModal, setShowAddLeadModal] = useState(false);
@@ -130,12 +133,21 @@ export default function Dashboard() {
       } catch {}
     }
 
+    // Advanced Cursor Tracking (Fixes the stuck taskbar bug)
     const handleMouseMove = (e: MouseEvent) => {
       setMousePos({ x: e.clientX, y: e.clientY });
-      setMouseVisible(true);
+      if (!mouseVisible) setMouseVisible(true);
+    };
+
+    const handleMouseOut = (e: MouseEvent) => {
+      // If the mouse moves out of the window to the taskbar/desktop, hide the cursor
+      if (!e.relatedTarget && !e.toElement) {
+        setMouseVisible(false);
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseout', handleMouseOut);
 
     // Generate random floating particles for the antigravity space backdrop on mount
     const colors = [
@@ -154,7 +166,7 @@ export default function Dashboard() {
     }));
     setParticles(particleList);
 
-    // Load Google Identity Services SDK Script if not already present
+    // Load Google Identity Services SDK Script
     const scriptId = 'google-gsi-client-script';
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
@@ -172,6 +184,7 @@ export default function Dashboard() {
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseout', handleMouseOut);
     };
   }, []);
 
@@ -199,7 +212,8 @@ export default function Dashboard() {
           (window as any).google.accounts.id.renderButton(btnContainer, {
             theme: 'dark',
             size: 'large',
-            width: 200
+            width: 200,
+            shape: 'pill'
           });
         }
       } catch (err) {
@@ -226,7 +240,9 @@ export default function Dashboard() {
         id: parsed.sub || 'usr_' + btoa(parsed.email).replace(/=/g, '').slice(0, 15),
         name: parsed.name,
         email: parsed.email,
-        avatar: parsed.picture
+        avatar: parsed.picture,
+        title: '',
+        company: ''
       };
       
       setUserProfile(profile);
@@ -240,7 +256,31 @@ export default function Dashboard() {
   function handleSignOut() {
     setUserProfile(null);
     localStorage.removeItem('salesfirst_user');
+    setShowProfileModal(false);
     showToast('Signed out successfully', 'info');
+  }
+
+  function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    if (userProfile) {
+      const updated = { ...userProfile, ...editProfile };
+      setUserProfile(updated);
+      localStorage.setItem('salesfirst_user', JSON.stringify(updated));
+      setShowProfileModal(false);
+      showToast('Profile settings saved!', 'success');
+    }
+  }
+
+  function openProfileModal() {
+    if (userProfile) {
+      setEditProfile({ 
+        name: userProfile.name || '', 
+        title: userProfile.title || '', 
+        company: userProfile.company || '', 
+        avatar: userProfile.avatar || '' 
+      });
+      setShowProfileModal(true);
+    }
   }
 
   const showToast = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
@@ -440,8 +480,6 @@ export default function Dashboard() {
 
   return (
     <div 
-      onMouseLeave={() => setMouseVisible(false)}
-      onMouseEnter={() => setMouseVisible(true)}
       style={{
         display: 'flex',
         minHeight: '100vh',
@@ -498,7 +536,7 @@ export default function Dashboard() {
         transition: 'opacity 0.2s ease'
       }} />
 
-      {/* Custom Neon Cursor Reticle — hidden when mouse leaves page */}
+      {/* Custom Neon Cursor Reticle */}
       <div style={{
         position: 'fixed',
         top: mousePos.y - 12,
@@ -555,7 +593,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - NO LOGIN OR PROFILE BUTTONS HERE */}
       <div style={{
         width: 250,
         background: STYLES.colors.sidebarBg,
@@ -586,7 +624,7 @@ export default function Dashboard() {
             background: STYLES.colors.primary,
             boxShadow: `0 0 15px 4px ${STYLES.colors.primary}`
           }} />
-          SalesFirst
+          SalesArc
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
@@ -653,7 +691,7 @@ export default function Dashboard() {
           
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(255,255,255,0.04)', color: '#FFFFFF', cursor: 'pointer', transition: 'all 0.2s ease' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(255,255,255,0.04)', color: '#FFFFFF', cursor: 'none', transition: 'all 0.2s ease' }}
               onClick={() => setShowOnboardModal(true)}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
@@ -662,7 +700,7 @@ export default function Dashboard() {
               Onboard from Transcript
             </button>
             <button
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(255,255,255,0.04)', color: '#FFFFFF', cursor: 'pointer', transition: 'all 0.2s ease' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(255,255,255,0.04)', color: '#FFFFFF', cursor: 'none', transition: 'all 0.2s ease' }}
               onClick={() => setShowAddLeadModal(true)}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
               onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'}
@@ -671,7 +709,7 @@ export default function Dashboard() {
               Add Lead
             </button>
             <button
-              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', background: STYLES.colors.primary, color: '#FFFFFF', cursor: 'pointer', boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)', transition: 'all 0.2s ease', opacity: running ? 0.75 : 1 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600, border: 'none', background: STYLES.colors.primary, color: '#FFFFFF', cursor: 'none', boxShadow: '0 0 15px rgba(99, 102, 241, 0.4)', transition: 'all 0.2s ease', opacity: running ? 0.75 : 1 }}
               onClick={runAgent}
               disabled={running}
               onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 25px rgba(99, 102, 241, 0.6)'}
@@ -685,42 +723,31 @@ export default function Dashboard() {
             {/* Vertical Divider */}
             <div style={{ width: 1, height: 28, background: STYLES.colors.border, margin: '0 4px' }} />
 
-            {/* ── Profile & Auth — far right of topbar ── */}
+            {/* ── Top-Right Auth & Profile ── */}
             {userProfile ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div 
+                onClick={openProfileModal}
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: 10, cursor: 'none', 
+                  padding: '4px 6px', borderRadius: 40, border: '1px solid transparent',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#FFF' }}>{userProfile.name}</div>
-                  <div style={{ fontSize: 11, color: STYLES.colors.textMuted, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>{userProfile.email}</div>
                 </div>
-                <a href="/profile" style={{ display: 'block', cursor: 'pointer', textDecoration: 'none' }} title="Edit Profile">
-                  <div style={{
-                    width: 40, height: 40, borderRadius: '50%',
-                    border: `2px solid ${STYLES.colors.primary}`,
-                    overflow: 'hidden', background: 'rgba(99,102,241,0.2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'transform 0.2s ease'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.05)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
-                  >
-                    {userProfile.avatar
-                      ? <img src={userProfile.avatar} alt={userProfile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <span style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>{userProfile.name[0]}</span>}
-                  </div>
-                </a>
-                <button
-                  onClick={handleSignOut}
-                  style={{
-                    cursor: 'pointer', padding: '8px 12px', borderRadius: 6,
-                    fontSize: 12, fontWeight: 600, background: 'rgba(239, 68, 68, 0.1)',
-                    color: STYLES.colors.red, border: '1px solid rgba(239, 68, 68, 0.2)',
-                    transition: 'all 0.15s ease'
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
-                >
-                  Log Out
-                </button>
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%',
+                  border: `2px solid ${STYLES.colors.primary}`,
+                  overflow: 'hidden', background: 'rgba(99,102,241,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {userProfile.avatar
+                    ? <img src={userProfile.avatar} alt={userProfile.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <span style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>{userProfile.name[0]}</span>}
+                </div>
               </div>
             ) : (
               <div id="google-signin-btn-container" style={{ minWidth: 200, minHeight: 40 }} />
@@ -1243,6 +1270,85 @@ export default function Dashboard() {
 
         </div>
       </div>
+
+      {/* Profile Details & Edit Popup Modal */}
+      {showProfileModal && userProfile && (
+        <>
+          <div
+            style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(6px)', zIndex: 10000 }}
+            onClick={() => setShowProfileModal(false)}
+          />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 460, background: '#0F172A', border: `1px solid ${STYLES.colors.border}`, borderRadius: 16, boxShadow: '0 25px 50px rgba(0,0,0,0.6)', zIndex: 10001, overflow: 'hidden'
+          }}>
+            <div style={{ padding: '20px 24px', borderBottom: `1px solid ${STYLES.colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#FFF' }}>Profile & Settings</h3>
+              <button onClick={() => setShowProfileModal(false)} style={{ background: 'transparent', border: 'none', fontSize: 24, color: STYLES.colors.textMuted, cursor: 'none' }}>&times;</button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Avatar Edit Row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 12, border: `1px solid ${STYLES.colors.border}` }}>
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(99,102,241,0.2)', border: `2px solid ${STYLES.colors.primary}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                  {editProfile.avatar || userProfile.avatar ? (
+                    <img src={editProfile.avatar || userProfile.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: 24, fontWeight: 700, color: '#FFF' }}>{userProfile.name[0]}</span>
+                  )}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: STYLES.colors.textMuted, display: 'block', marginBottom: 6 }}>AVATAR URL (Edit Image)</label>
+                  <input type="text" value={editProfile.avatar} onChange={e => setEditProfile({...editProfile, avatar: e.target.value})} placeholder="Paste an image URL..." style={{ width: '92%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(255,255,255,0.03)', color: '#FFF', fontSize: 12 }} />
+                </div>
+              </div>
+
+              {/* Locked Fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: STYLES.colors.textMuted, display: 'block', marginBottom: 4 }}>EMAIL (Locked)</label>
+                  <input type="email" value={userProfile.email} disabled style={{ width: '90%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(0,0,0,0.4)', color: '#64748B', cursor: 'not-allowed', fontSize: 12 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: STYLES.colors.textMuted, display: 'block', marginBottom: 4 }}>USER ID (Locked to Email)</label>
+                  <input type="text" value={userProfile.id} disabled style={{ width: '90%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(0,0,0,0.4)', color: '#64748B', cursor: 'not-allowed', fontSize: 12 }} />
+                </div>
+              </div>
+
+              {/* Editable Fields */}
+              <div>
+                <label style={{ fontSize: 10, fontWeight: 700, color: STYLES.colors.textMuted, display: 'block', marginBottom: 4 }}>FULL NAME</label>
+                <input required type="text" value={editProfile.name} onChange={e => setEditProfile({...editProfile, name: e.target.value})} style={{ width: '95%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(0,0,0,0.2)', color: '#FFF', fontSize: 13 }} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: STYLES.colors.textMuted, display: 'block', marginBottom: 4 }}>JOB TITLE</label>
+                  <input type="text" placeholder="e.g. Sales Rep" value={editProfile.title} onChange={e => setEditProfile({...editProfile, title: e.target.value})} style={{ width: '90%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(0,0,0,0.2)', color: '#FFF', fontSize: 13 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 700, color: STYLES.colors.textMuted, display: 'block', marginBottom: 4 }}>COMPANY</label>
+                  <input type="text" placeholder="e.g. SalesFirst Inc." value={editProfile.company} onChange={e => setEditProfile({...editProfile, company: e.target.value})} style={{ width: '90%', padding: '8px 12px', borderRadius: 6, border: `1px solid ${STYLES.colors.border}`, background: 'rgba(0,0,0,0.2)', color: '#FFF', fontSize: 13 }} />
+                </div>
+              </div>
+
+              {/* Actions Footer */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, paddingTop: 16, borderTop: `1px solid ${STYLES.colors.border}` }}>
+                <button type="button" onClick={handleSignOut} style={{ padding: '8px 16px', borderRadius: 8, background: 'rgba(239, 68, 68, 0.1)', color: STYLES.colors.red, border: '1px solid rgba(239, 68, 68, 0.2)', fontWeight: 600, fontSize: 13, cursor: 'none' }}>
+                  Log Out
+                </button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={() => setShowProfileModal(false)} style={{ padding: '8px 16px', borderRadius: 8, background: 'transparent', color: '#FFF', border: `1px solid ${STYLES.colors.border}`, fontWeight: 600, fontSize: 13, cursor: 'none' }}>
+                    Cancel
+                  </button>
+                  <button type="submit" style={{ padding: '8px 20px', borderRadius: 8, background: STYLES.colors.primary, color: '#FFF', border: 'none', fontWeight: 700, fontSize: 13, cursor: 'none' }}>
+                    Save Profile
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
 
       {/* Interactive Detail Side Drawer */}
       {selectedLeadId && selectedLead && (
